@@ -39,4 +39,14 @@ public class ExpireMapTest {
     map.put("hello", "world", -100);
     assertEquals(map.get("hello"),null);
   }
+  
+  @Test
+  public void timestampReset() throws InterruptedException {
+    ConcurrentExpireHashMap<String, String> map = new ConcurrentExpireHashMap<String, String>();
+    map.put("hello", "world", 10000);
+    map.put("hello", "world", 200);
+    assertEquals(map.get("hello"),"world");
+    Thread.sleep(200);
+    assertEquals(map.get("hello"),null);
+  }
 }

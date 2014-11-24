@@ -49,6 +49,7 @@ public class ConcurrentExpireHashMap<K,V> implements ExpireMap<K,V> {
   ConcurrentSkipListSet<KeyValueTimestamp<K,V>> expirationSet;
   RemovalLoop removalLoop;
   
+  // a task that removes elements from the hash map once they expire
   private class RemovalLoop implements Runnable {
     public void run() {
       while(true) {
