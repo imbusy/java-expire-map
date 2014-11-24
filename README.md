@@ -3,7 +3,8 @@ java-expire-map
 
 A map that allows automatic removal of elements after a specified timeout.
 
-** Implementation details **
+Implementation details
+----------------------
 
 Inernally uses a ConcurrentHashMap to store the `key, (value, removal timestamp)` values
 and a ConcurrentSkipListSet to keep an ordered set of `key, (value, removal timestamp)` ordered
