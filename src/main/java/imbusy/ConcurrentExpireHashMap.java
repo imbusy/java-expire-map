@@ -82,10 +82,12 @@ public class ConcurrentExpireHashMap<K,V> implements ExpireMap<K,V> {
         }
         
         try {
-          if(nextTimestamp > 0) {
-            Thread.sleep(nextTimestamp - curTimestamp);
-          } else {
-            Thread.sleep(1000);
+          synchronized(this) {
+            if(nextTimestamp > 0) {
+              wait(nextTimestamp - curTimestamp);
+            } else {
+              wait(1000);
+            }
           }
         } catch(InterruptedException e) {
         }
