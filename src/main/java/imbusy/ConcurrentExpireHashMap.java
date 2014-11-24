@@ -24,6 +24,8 @@ public class ConcurrentExpireHashMap<K,V> implements ExpireMap<K,V> {
   // the underlying hash map
   private ConcurrentHashMap<K, ValueTimestamp<V>> hashMap;
   
+  // used in RemovalLoop to store the exact key, value, timestamp
+  // triples to be removed
   private static class KeyValueTimestamp<K, V> {
     public KeyValueTimestamp(K key, ValueTimestamp<V> valueTimestamp) {
       this.key = key;
@@ -44,13 +46,24 @@ public class ConcurrentExpireHashMap<K,V> implements ExpireMap<K,V> {
       return false;
     }
   }
-  
-  // an ordered set where we store element expiration times
-  ConcurrentSkipListSet<KeyValueTimestamp<K,V>> expirationSet;
-  RemovalLoop removalLoop;
-  
+    
   // a task that removes elements from the hash map once they expire
   private class RemovalLoop implements Runnable {
+    
+    // an ordered set where we store element expiration times
+    ConcurrentSkipListSet<KeyValueTimestamp<K,V>> expirationSet;
+    
+    public RemovalLoop() {
+      expirationSet = new ConcurrentSkipListSet<KeyValueTimestamp<K,V>>(
+        new Comparator<KeyValueTimestamp<K, V>>() { // order by timestamp
+          public int compare(KeyValueTimestamp<K, V> a, KeyValueTimestamp<K, V> b) {
+            return a.valueTimestamp.timeout > b.valueTimestamp.timeout ? 1 
+                    : a.valueTimestamp.timeout < b.valueTimestamp.timeout ? -1 : 0;
+          }
+        }
+      );
+    }
+    
     public void run() {
       while(true) {
         long nextTimestamp = -1;
@@ -79,22 +92,18 @@ public class ConcurrentExpireHashMap<K,V> implements ExpireMap<K,V> {
       }
     }
     
-    public synchronized void newValue() {
-      notify();
+    public void newValue(K key, ValueTimestamp vt) {
+      expirationSet.add(new KeyValueTimestamp(key, vt));
+      synchronized(this) {
+        notify();
+      }
     }
   }
   
+  RemovalLoop removalLoop;
+  
   public ConcurrentExpireHashMap() {
     hashMap = new ConcurrentHashMap<K, ValueTimestamp<V>>();
-    
-    expirationSet = new ConcurrentSkipListSet<KeyValueTimestamp<K,V>>(
-      new Comparator<KeyValueTimestamp<K, V>>() {
-        public int compare(KeyValueTimestamp<K, V> a, KeyValueTimestamp<K, V> b) {
-          return a.valueTimestamp.timeout > b.valueTimestamp.timeout ? 1 
-                  : a.valueTimestamp.timeout < b.valueTimestamp.timeout ? -1 : 0;
-        }
-      }
-    );
     
     removalLoop = new RemovalLoop();
     Thread t = new Thread(removalLoop);
@@ -105,8 +114,7 @@ public class ConcurrentExpireHashMap<K,V> implements ExpireMap<K,V> {
     if(timeoutMs > 0) {
       ValueTimestamp<V> vt = new ValueTimestamp<V>(value, timeoutMs);
       hashMap.put(key, vt);
-      expirationSet.add(new KeyValueTimestamp(key, vt));
-      removalLoop.newValue();
+      removalLoop.newValue(key, vt);
     }
   }
    
